@@ -1,7 +1,7 @@
 # coding: iso-8859-1
 
-import cgitb
-cgitb.enable()
+#import cgitb
+#cgitb.enable()
 
 """ Controller for the guestbook:
 
