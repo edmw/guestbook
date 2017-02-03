@@ -1,0 +1,41 @@
+<html>
+
+<head>
+	<title>Guestbook</title>
+</head>
+
+<body>
+	<h2>Einträge auflisten</h2>
+	
+	<p><a node="con:form_link">Eintrag hinzufügen</a></p>
+	
+	<p>
+		Eintrag
+		<span node="-con:first_entry_index">X</span>
+		bis
+		<span node="-con:last_entry_index">Y</span>
+		von
+		<span node="-con:number_of_entries">Z</span>
+		Einträgen
+	</p>
+	
+	<div>
+		<span node="rep:previous"><a node="con:previous_link">Vorherige Seite</a></span>
+		|
+		<span node="rep:next"><a node="con:next_link">Nächste Seite</a></span>
+	</div>
+	
+	<div node="rep:entry">
+		<hr />
+		<h3>#<span node="-con:num">0</span> - <span node="-con:date">date</span></h3>
+		<h4><span node="-con:name">name</span> (<span node="-con:email">email</span>)</h4>
+		
+		<p node="con:message"></p>
+	</div>
+	
+	<hr />
+
+	<div node="con:dummy"></div>
+</body>
+
+</html>

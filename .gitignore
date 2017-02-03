@@ -1,0 +1,9 @@
+*.pyc
+*.log
+sushi-tsu-de.py
+sushi-tsu-en.py
+sushi-tsu-de-2016.py
+sushi-tsu-en-2016.py
+sushi-tsu-de-preview.py
+sushi-tsu-en-preview.py
+

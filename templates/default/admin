@@ -1,0 +1,12 @@
+<html>
+
+<head>
+	<title>Guestbook admin</title>
+</head>
+
+<body>
+	<h2 node="con:title">Title</h2>
+	<div node="con:message">Message</div>
+</body>
+
+</html>

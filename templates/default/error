@@ -1,0 +1,12 @@
+<html>
+
+<head>
+	<title>Guestbook</title>
+</head>
+
+<body>
+	<h2 node="con:title">Fehler</h2>
+	<div node="con:message">Es ist ein Feher aufgetreten.</div>
+</body>
+
+</html>

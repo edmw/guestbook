@@ -1,0 +1,73 @@
+<html>
+
+<head>
+	<title>Guestbook</title>
+</head>
+
+<body>
+	<h2>Eintrag hinzufügen</h2>
+	
+	<p><a node="con:list_link">Einträge auflisten</a></p>
+	
+	<form node="rep:form">
+	<span node="-rep:hidden_values"><input node="con:hidden_input" type="hidden"></input>
+	</span>
+	
+	<table>
+	<tr>
+		<td>Name:</td>
+		<td><input type="text" node="con:name_input" /><emp node="rep:name_error">Bitte geben Sie Ihren Namen ein!</emp></td>
+	</tr>
+	<tr>
+		<td>E-Mail:</td>
+		<td><input type="text" node="con:email_input" /><emp node="rep:email_error">Die Eingabe E-Mail ist nicht gültig!</emp></td>
+	</tr>
+	<tr>
+		<td>Message:</td>
+		<td><textarea rows="8" cols="40" node="con:message_input"></textarea></td>
+	</tr>
+	<tr node="rep:message_error">
+		<td></td>
+		<td><emp>Die Nachricht muss mindestens 6 Zeichen und darf höchstens 2000 Zeichen lang sein!</emp></td>
+	</tr>
+	<tr>
+		<td></td>
+		<td>
+			<table cellspacing="0" cellpadding="0">
+			<tr>
+				<td><input type="text" node="con:code_input" /></td>
+				<td><img node="con:code"></img></td>
+			</tr>
+			</table>
+		</td>
+	</tr>
+	<tr node="rep:code_error">
+		<td></td>
+		<td><emp>Bitte geben Sie den richtigen Code ein!</emp></td>
+	</tr>
+	<tr>
+		<td></td>
+		<td>
+			<input type="submit" value="Eintragen" />
+			<input type="submit" name="preview" value="Vorschau" />
+			<input type="reset" value="Zurücksetzen" />
+		</td>
+	</tr>
+	</table>
+	
+	</form>
+
+	<div node="rep:entry">
+		<h3>Vorschau für Ihren Eintrag:</h3>
+		<hr />
+		<h3>#<span node="-con:num">0</span> - <span node="-con:date">date</span></h3>
+		<h4><span node="-con:name"></span> (<span node="-con:email"></span>)</h4>
+		
+		<p node="con:message"><span></span></p>
+		
+		<hr />
+	</div>
+	
+</body>
+
+</html>
