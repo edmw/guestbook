@@ -57,4 +57,4 @@ adminSecret = "..."
 adminEmail = "..."
 
 def get():
-    return dict([(k, v) for k, v in globals().items() if not k.startswith("__")])
+    return dict([(k, v) for k, v in list(globals().items()) if not k.startswith("__")])

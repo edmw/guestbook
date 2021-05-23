@@ -42,6 +42,8 @@
 
 import sys, os, os.path, time, random
 
+import urllib.request, urllib.parse, urllib.error, urllib.request, urllib.error, urllib.parse, json
+
 try:
     import logging
 except ImportError:
@@ -49,7 +51,7 @@ except ImportError:
 
 from Database import Database, DatabaseError
 
-from Spamcheck import Spamcheck
+from Spamcheck import Spamcheck, SpamcheckError
 
 from HTMLProducer import HTMLProducer
 
@@ -69,7 +71,9 @@ class StringHelper(object):
             "".join([chr(x) for x in range(32)])
         self.control_characters_crlf = \
             "".join([chr(x) for x in range(32) if x != ord('\r') and x != ord('\n')])
-        self.translate_identity = string.maketrans("","")
+        self.translate_identity = str.maketrans("","")
+        self.trans_remove_cc = str.maketrans("", "", self.control_characters)
+        self.trans_remove_cc_crlf = str.maketrans("", "", self.control_characters_crlf)
 
     def filterALPHANUM(self, text):
         if text:
@@ -79,30 +83,30 @@ class StringHelper(object):
     def stripCONTROL(self, text, crlf = True):
         if text:
             if crlf:
-                return text.translate(self.translate_identity, self.control_characters)
+                return text.translate(self.trans_remove_cc)
+                #return text.translate(self.translate_identity, self.control_characters)
             else:
-                return text.translate(self.translate_identity, self.control_characters_crlf)
+                return text.translate(self.trans_remove_cc_crlf)
+                #return text.translate(self.translate_identity, self.control_characters_crlf)
         return ""
 
     def stripHTML(self, text):
-        from HTMLParser import HTMLParser, HTMLParseError
+        from html.parser import HTMLParser
 
         if text:
             text = self.stripCONTROL(text, crlf = False)
 
             class Parser(HTMLParser):
                 def __init__(self):
+                    super().__init__()
                     self.reset()
                     self.data = []
                 def handle_data(self, data):
                     self.data.append(data)
 
-            try:
-                p = Parser()
-                p.feed(text)
-                return "".join(p.data)
-            except HTMLParseError, x:
-                return text
+            p = Parser()
+            p.feed(text)
+            return "".join(p.data)
 
         return ""
 
@@ -146,7 +150,7 @@ class Mailbase(object):
                     s.sendmail(self.sender, to, body)
                 finally:
                     s.close()
-            except smtplib.SMTPException, x:
+            except smtplib.SMTPException as x:
                 warning("error while sending mail %s" % str(x))
 
 class Mail(object):
@@ -154,9 +158,9 @@ class Mail(object):
         self.scriptURL = config["scriptURL"]
 
     def getUrl(self, **kw):
-        import urllib
+        import urllib.request, urllib.parse, urllib.error
         if len(kw):
-            return "%s?%s" % (self.scriptURL, urllib.urlencode(kw))
+            return "%s?%s" % (self.scriptURL, urllib.parse.urlencode(kw))
         return self.scriptURL
 
     def __str__(self):
@@ -166,7 +170,7 @@ class OkMail(Mail):
     def __init__(self, config, entry):
         super(OkMail, self).__init__(config)
 
-        self.entry = dict(zip(["id", "timestamp", "name", "email", "message", "rating", "hash"], entry))
+        self.entry = dict(list(zip(["id", "timestamp", "name", "email", "message", "rating", "hash"], entry)))
 
         self.entry["rating"] = str(self.entry["rating"])
 
@@ -215,7 +219,7 @@ class Resource(object):
                 self.headers["Content-type"] = "%s; charset=%s" % (contenttype, charset)
             else:
                 self.headers["Content-type"] = contenttype
-        for key, value in self.headers.items():
+        for key, value in list(self.headers.items()):
             sys.stdout.write("%s: %s\n" % (key, value))
         sys.stdout.write("\n")
 
@@ -234,7 +238,7 @@ class HTTPResource(Resource):
         self.code = code
 
     def emit(self):
-        print "Status: %s" % self.codes[self.code]
+        print("Status: %s" % self.codes[self.code])
         self.emitHeaders(None)
 
 ###########################################################################
@@ -272,10 +276,10 @@ class Page(Resource):
     def emit(self):
         if self.template:
             self.emitHeaders("text/html", self.charset)
-            print self.template.render()
+            print(self.template.render())
         else:
             self.emitHeaders("text/plain")
-            print "ERROR EMITTING PAGE"
+            print("ERROR EMITTING PAGE")
 
 ###########################################################################
 
@@ -293,21 +297,25 @@ class BasePage(Page):
         l = locale.getlocale()
         if not l[0]:
             l = locale.getdefaultlocale()
-        self.encoding = l[1]
+        if not l[1]:
+            self.encoding = 'utf-8'
+        else:
+            self.encoding = l[1]
 
         self.scriptURL = config["scriptURL"]
 
     def getUrl(self, **kw):
-        import urllib
+        import urllib.request, urllib.parse, urllib.error
         if len(kw):
-            return "%s?%s" % (self.scriptURL, urllib.urlencode(kw))
+            return "%s?%s" % (self.scriptURL, urllib.parse.urlencode(kw))
         return self.scriptURL
 
     def formatDate(self, timestamp):
         t = time.localtime(timestamp)
         if self.dateformat:
             s = time.strftime(self.dateformat, t)
-            return unicode(s, self.encoding).encode(self.charset)
+            return s
+            #return str(s, self.encoding).encode(self.charset)
         else:
             return str(t)
 
@@ -315,7 +323,8 @@ class BasePage(Page):
         t = time.localtime(timestamp)
         if self.timeformat:
             s = time.strftime(self.timeformat, t)
-            return unicode(s, self.encoding).encode(self.charset)
+            return s
+            #return str(s, self.encoding).encode(self.charset)
         else:
             return str(t)
 
@@ -413,25 +422,29 @@ class EntryPage(BasePage):
         return self.producer.make(text)
 
     def renderEntry(self, node, item):
+        from ftfy import ftfy
+
         num = item[0]
         entry = item[1]
+        name = ftfy(entry[2])
+        text = ftfy(entry[4])
         self.setContent(node, "id", entry[0])
         self.setContent(node, "date", self.formatDate(entry[1]))
         self.setContent(node, "time", self.formatTime(entry[1]))
 
         if not entry[3]:
-            self.setContent(node, "name", entry[2])
-            self.setContent(node, "email","")
+            self.setContent(node, "name", name)
+            self.setContent(node, "email", "")
         else:
             # with email
             # email will not be displayed
-            self.setContent(node, "name", entry[2])
+            self.setContent(node, "name", name)
             self.setContent(node, "email", "")
             #old code to display email
             #self.setContent(node, "email", entry[2])
             #self.setAttribute(node, "email", "href", "mailto:%s" % entry[3])
 
-        self.setContent(node, "message", self.formatText(entry[4]), raw = True)
+        self.setContent(node, "message", self.formatText(text), raw = True)
 
         self.setContent(node, "num", str(num))
 
@@ -440,6 +453,9 @@ class ListPage(EntryPage):
             Extends Entry Page.
     """
     pageName = "list"
+
+    def __init__(self, config):
+        super(ListPage, self).__init__(config)
 
     def renderPrevious(self, node, index):
         if self.firstEntryIndex <= 0:
@@ -456,7 +472,7 @@ class ListPage(EntryPage):
     def render(self, template):
         super(ListPage, self).render(template)
 
-	if getattr(self, "success", None) is not None:
+        if getattr(self, "success", None) is not None:
             template.thanks.emit()
 
         self.setContent(template, "number_of_entries", str(self.numberOfEntries))
@@ -478,7 +494,7 @@ class ListPage(EntryPage):
         template.next_bottom.repeat(self.renderNext, (index,))
 
         num = self.numberOfEntries - self.firstEntryIndex
-        template.entry.repeat(self.renderEntry, zip(range(num, num - len(self.entries), -1), self.entries))
+        template.entry.repeat(self.renderEntry, list(zip(list(range(num, num - len(self.entries), -1)), self.entries)))
 
 class FormPage(EntryPage):
     """    Page for a entry form.
@@ -514,7 +530,7 @@ class FormPage(EntryPage):
         con = "%s_input" % name
         self.setAttribute(container, con, "name", name)
         if name == "message":
-	    self.setContent(container, con, value)
+            self.setContent(container, con, value)
         else:
             self.setAttribute(container, con, "value", value)
         if container is not template:
@@ -585,10 +601,11 @@ class Image(Resource):
 
         if self.image:
             self.emitHeaders("image/png")
-            self.image.save(sys.stdout, "PNG")
+            sys.stdout.flush()
+            self.image.save(sys.stdout.buffer, "PNG")
         else:
             self.emitHeaders("text/plain")
-            print "ERROR EMITTING IMAGE"
+            print("ERROR EMITTING IMAGE")
 
 class CaptchaImage(Image):
     def __init__(self, text, fontfilename, fontsize):
@@ -604,7 +621,7 @@ class CaptchaImage(Image):
         self.foregroundcolor = 0x000000
 
     def getFont(self):
-        import ImageFont
+        from PIL import ImageFont
         if not self.font:
             if self.fontfilename.endswith(".ttf"):
                 self.font = ImageFont.truetype(self.fontfilename, self.fontsize)
@@ -615,9 +632,9 @@ class CaptchaImage(Image):
         return self.font
 
     def render(self):
-        import Image
-        import ImageFont
-        import ImageDraw
+        from PIL import Image
+        from PIL import ImageFont
+        from PIL import ImageDraw
 
         font = self.getFont()
         dim = font.getsize(self.text)
@@ -627,6 +644,24 @@ class CaptchaImage(Image):
         self.image = image
 
 ###########################################################################
+
+def check_recaptcha(response, secret):
+    logging.info("rec: %s" % response)
+    url = 'https://www.google.com/recaptcha/api/siteverify'
+    values = {
+        'secret': secret,
+        'response': response
+    }
+    data = urllib.parse.urlencode(values)
+    logging.info("req: %s" % data)
+    req = urllib.request.Request(url, data.encode("ascii"))
+    res = urllib.request.urlopen(req)
+    logging.info("res: %s" % res)
+    result = json.load(res)
+    logging.info("result: %s" % result)
+    success = result.get('success', False)
+    logging.info("result: %s" % success)
+    return success
 
 class Controller(object):
     def __init__(self, config, database):
@@ -645,14 +680,14 @@ class PageController(Controller):
         self.spamcheck = Spamcheck(*[config[k] for k in ("spamAPIKey",)])
 
     def createCode(self):
-        import sha
+        import hashlib
 
         code = str(random.randint(10000, 99999))
 
-        s = sha.new()
-        s.update(str(time.time()))
-        s.update(str(random.random()))
-        s.update(code)
+        s = hashlib.sha1()
+        s.update(str(time.time()).encode("ascii"))
+        s.update(str(random.random()).encode("ascii"))
+        s.update(code.encode("ascii"))
         hash = "%s-%s" % (s.hexdigest(), int(time.time()))
 
         return hash, code
@@ -695,6 +730,8 @@ class PageController(Controller):
         code = sh.stripCONTROL(fields.getfirst("code", "").strip())
         captcha = sh.stripCONTROL(fields.getfirst("captcha", "").strip())
 
+        recaptcha = sh.stripCONTROL(fields.getfirst("g-recaptcha-response", "").strip())
+
         # form page
         page = FormPage(self.config)
         # setup form page
@@ -706,6 +743,7 @@ class PageController(Controller):
 
         # which action to execute? default is initialize form
         action = sh.filterALPHANUM(fields.getfirst("action", "init").lower())
+        logging.info("Executing form action: %s" % action)
         if action == "save":
             # validate page
             errors = page.validate()
@@ -726,32 +764,41 @@ class PageController(Controller):
                             # remove code
                             self.database.deleteCode(captcha)
 
-                            # check spam
-                            try:
-                                rating = Spamcheck.SPAM if self.spamcheck.check(message) else Spamcheck.HAM
-                            except HTTPError as x:
-                                logging.error("Spamcheck HTTP Error: %s" % str(x))
-                                rating = Spamcheck.UNKNOWN
-                            except SpamcheckError as x:
-                                logging.error("Spamcheck Error: %s" % str(x))
-                                rating = Spamcheck.UNKNOWN
+                            # check recaptcha
+                            if check_recaptcha(recaptcha, self.config["recaptchaSecret"]):
+                                logging.info("recaptcha ok")
 
-                            # insert entry
-                            entry = self.database.insertEntry(
-                                 self.config["adminSecret"], name, email, message, rating)
+                                # check spam
+                                try:
+                                    rating = Spamcheck.SPAM if self.spamcheck.check(message) else Spamcheck.HAM
+                                except urllib.error.HTTPError as x:
+                                    logging.error("Spamcheck HTTP Error: %s" % str(x))
+                                    rating = Spamcheck.UNKNOWN
+                                except SpamcheckError as x:
+                                    logging.error("Spamcheck Error: %s" % str(x))
+                                    rating = Spamcheck.UNKNOWN
 
-                            # send mail
-                            mail = OkMail(self.config, entry)
-                            self.mailbase.sendMail(
-                                 self.config["adminEmail"], mail, "[%s] New entry" % self.config["title"])
+                                # insert entry
+                                entry = self.database.insertEntry(
+                                     self.config["adminSecret"], name, email, message, rating)
 
-                            # display ok page
-                            if "templateInlineMessages" in self.config:
-                                resource = HTTPResource(302)
-                                resource.headers["Location"] = page.getUrl(page="list", index=0, success="True")
-                                return resource
+                                # send mail
+                                mail = OkMail(self.config, entry)
+                                self.mailbase.sendMail(
+                                     self.config["adminEmail"], mail, "[%s] New entry" % self.config["title"])
+
+                                # display ok page
+                                if "templateInlineMessages" in self.config:
+                                    resource = HTTPResource(302)
+                                    resource.headers["Location"] = page.getUrl(page="list", index=0, success="True")
+                                    return resource
+                                else:
+                                    page = OkPage(self.config)
+
                             else:
-                                page = OkPage(self.config)
+                                page = ErrorPage(self.config)
+                                page.title = "Error"
+                                page.message = "Recaptcha invalid!"
 
                         else:
                             page.errors.append("code")
@@ -780,7 +827,7 @@ class PageController(Controller):
         # list page
         page = ListPage(self.config)
 
-	page.success = fields.getfirst("success", None) if fields else None
+        page.success = fields.getfirst("success", None) if fields else None
 
         numberOfEntries = self.database.selectNumberOfEntries()
         numberOfEntriesPerPage = self.config["numberOfEntriesPerPage"]
@@ -838,7 +885,7 @@ class ImageController(Controller):
     def run(self, fields):
         captcha = fields.getfirst("captcha", None)
 
-        if os.environ.has_key("HTTP_IF_NONE_MATCH"):
+        if "HTTP_IF_NONE_MATCH" in os.environ:
             etag = os.environ["HTTP_IF_NONE_MATCH"]
             if etag == captcha:
                 return HTTPResource(304)
@@ -880,7 +927,7 @@ def run(config, fields):
         finally:
             database.close()
 
-    except DatabaseError, de:
+    except DatabaseError as de:
         resource = ErrorPage(config)
         resource.title = "Database Error"
         resource.message = de.text

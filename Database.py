@@ -92,7 +92,7 @@ class Database(object):
                    passwd = self.password,
                    db = self.database
                )
-        except MySQLdb.Error, e:
+        except MySQLdb.Error as e:
             raise DatabaseError("Error %d: %s" % (e.args[0], e.args[1]))
 
     def close(self):
@@ -124,8 +124,8 @@ class Database(object):
             finally:
                 cursor.close()
             return result
-        except MySQLdb.Error, e:
-            raise DatabaseError("Error %d: %s" % (e.args[0], e.args[1]))
+        except MySQLdb.Error as e:
+            raise DatabaseError("Error %d: %s (%s, %s)" % (e.args[0], e.args[1], statement, str(variables)))
 
     def execute_insert(self, statement, data):
         """    Executes the given insert statement.
@@ -137,8 +137,8 @@ class Database(object):
             finally:
                 cursor.close()
             return
-        except MySQLdb.Error, e:
-            raise DatabaseError("Error %d: %s" % (e.args[0], e.args[1]))
+        except MySQLdb.Error as e:
+            raise DatabaseError("Error %d: %s ('%s', '%s')" % (e.args[0], e.args[1], statement, str(data)))
 
     def selectNumberOfEntries(self):
         """    Selects the number of guestbook entries stored in the database.
@@ -154,7 +154,7 @@ class Database(object):
     def selectEntries(self, s, m):
         """    Selects guestbook entries stored in the database.
 
-                Selects m rows beginning from row s.
+               Selects m rows beginning from row s.
         """
         return self.execute(
             SPACE.join((
@@ -173,12 +173,12 @@ class Database(object):
         """
         import time
         timestamp = int(time.time())
-        import sha
-        hash = sha.new(secret)
-        hash.update(str(timestamp))
-        hash.update(str(name))
-        hash.update(str(email))
-        hash.update(str(message))
+        import hashlib
+        hash = hashlib.sha1(secret.encode("utf-8"))
+        hash.update(str(timestamp).encode("ascii"))
+        hash.update(str(name).encode("utf-8"))
+        hash.update(str(email).encode("utf-8"))
+        hash.update(str(message).encode("utf-8"))
         self.execute_insert(
             SPACE.join((
                 "INSERT INTO %s" % self.tablename("entries"),
@@ -232,7 +232,7 @@ class Database(object):
                  "SELECT code",
                  "FROM %s" % self.tablename("codes"),
                  "WHERE id = %s and timestamp > %s",
-             )),
+            )),
             self.__fetchCode,
             (id, timestamp)
         )
@@ -252,14 +252,14 @@ class Database(object):
            (id, timestamp, code)
         )
 
-    def deleteCode(self, id):
+    def deleteCode(self, cid):
         """    Deletes guestbook code from the database.
         """
         return self.execute(
             SPACE.join((
                 "DELETE FROM %s" % self.tablename("codes"),
-                "WHERE id = %s",
+                "WHERE id = %s and timestamp > %s",
             )),
             lambda x: x,
-            (id)
+            (cid, 0)
         )

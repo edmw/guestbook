@@ -35,8 +35,8 @@
 
 import os, logging
 
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 
 ###########################################################################
 
@@ -73,14 +73,14 @@ class Spamcheck(object):
     def _request(self, url, data, headers):
         logging.debug("request url=%s" % url)
         try:
-            f = urllib2.urlopen(urllib2.Request(url, data, headers))
+            f = urllib.request.urlopen(urllib.request.Request(url, data, headers))
             response = f.read()
         except Exception as e:
-            raise AkismetError(str(e))
+            raise SpamcheckError(str(e))
         logging.debug("response=%s" % response)
         return response
 
-    def _build_data_from_environment(self):
+    def _build_data_from_environment(self, comment):
         data = {}
         try:
             data['user_ip'] = os.environ['REMOTE_ADDR']
@@ -96,13 +96,14 @@ class Spamcheck(object):
         data.setdefault('comment_author', '')
         data.setdefault('comment_author_email', '')
         data.setdefault('comment_author_url', '')
-        data.setdefault('SERVER_ADDR', os.environ.get('SERVER_ADDR', ''))
-        data.setdefault('SERVER_ADMIN', os.environ.get('SERVER_ADMIN', ''))
-        data.setdefault('SERVER_NAME', os.environ.get('SERVER_NAME', ''))
-        data.setdefault('SERVER_PORT', os.environ.get('SERVER_PORT', ''))
-        data.setdefault('SERVER_SIGNATURE', os.environ.get('SERVER_SIGNATURE', ''))
-        data.setdefault('SERVER_SOFTWARE', os.environ.get('SERVER_SOFTWARE', ''))
-        data.setdefault('HTTP_ACCEPT', os.environ.get('HTTP_ACCEPT', ''))
+        data.setdefault('comment_content', comment)
+        #data.setdefault('SERVER_ADDR', os.environ.get('SERVER_ADDR', ''))
+        #data.setdefault('SERVER_ADMIN', os.environ.get('SERVER_ADMIN', ''))
+        #data.setdefault('SERVER_NAME', os.environ.get('SERVER_NAME', ''))
+        #data.setdefault('SERVER_PORT', os.environ.get('SERVER_PORT', ''))
+        #data.setdefault('SERVER_SIGNATURE', os.environ.get('SERVER_SIGNATURE', ''))
+        #data.setdefault('SERVER_SOFTWARE', os.environ.get('SERVER_SOFTWARE', ''))
+        #data.setdefault('HTTP_ACCEPT', os.environ.get('HTTP_ACCEPT', ''))
         data.setdefault('blog', 'sushi-tsu.info')
         return data
 
@@ -115,16 +116,16 @@ class Spamcheck(object):
         if self.api_key is None:
             raise SpamcheckError("API key not set")
 
-        data = self._build_data_from_environment()
+        data = self._build_data_from_environment(comment)
 
         url = '%scomment-check' % self._get_url()
         headers = { 'User-Agent': self.user_agent }
 
-        response = self._request(url, urllib.urlencode(data, doseq=True), headers)
+        response = self._request(url, urllib.parse.urlencode(data, doseq=True), headers)
         response = response.lower()
         if response == 'true':
             return True
         elif response == 'false':
             return False
         else:
-            raise AkismetError('missing required argument.')
+            raise SpamcheckError('missing required argument.')
